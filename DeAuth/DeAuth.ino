@@ -14,11 +14,11 @@ extern "C" {
 
 // Put Your devices here, system will skip them on deauth
 #define WHITELIST_LENGTH 2
-uint8_t whitelist[WHITELIST_LENGTH][ETH_MAC_LEN] = { { 0x77, 0xEA, 0x3A, 0x8D, 0xA7, 0xC8 }, {  0x40, 0x65, 0xA4, 0xE0, 0x24, 0xDF } };
+uint8_t whitelist[WHITELIST_LENGTH][ETH_MAC_LEN] = { {  0xe8, 0x48, 0xb8, 0x7d, 0x7f, 0x76 }, { 0x5c, 0x92, 0x5e, 0x76, 0x2b, 0xf8 } };
 
 // Declare to whitelist STATIONs ONLY, otherwise STATIONs and APs can be whitelisted
 // If AP is whitelisted, all its clients become automatically whitelisted
-//#define WHITELIST_STATION 
+#define WHITELIST_STATION
 
 // Channel to perform deauth
 uint8_t channel = 0;
@@ -392,6 +392,20 @@ bool check_whitelist(uint8_t *macAdress){
   return false;
 }
 
+bool check_whitelist2(clientinfo ci)
+{
+  if (ci.err != 0) {
+  } else {
+    for (int u = 0; u < aps_known_count; u++)
+    {
+      if (!memcmp(aps_known[u].bssid, ci.bssid, ETH_MAC_LEN) && (String((char *)aps_known[u].ssid) == "AZM Net 1" || String((char *)aps_known[u].ssid) == "AZM Net 2" || String((char *)aps_known[u].ssid) == "AZM Net 3")) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.printf("\n\nSDK version:%s\n", system_get_sdk_version());
@@ -423,12 +437,15 @@ void loop() {
           if (aps_known[ua].channel == channel) {
             for (int uc = 0; uc < clients_known_count; uc++) {
               if (! memcmp(aps_known[ua].bssid, clients_known[uc].bssid, ETH_MAC_LEN)) {
-#ifdef WHITELIST_STATION
-                address_to_check = clients_known[uc].station;
-#else
-                address_to_check = clients_known[uc].ap;
-#endif
-                if (check_whitelist(address_to_check)) {
+                
+                #ifdef WHITELIST_STATION
+                  address_to_check = clients_known[uc].station;
+                #else
+                  address_to_check = clients_known[uc].ap;
+                #endif
+                
+                // if (check_whitelist(address_to_check)) {
+                if (check_whitelist2(clients_known[uc])) {
                   friendly_device_found = true;
                   Serial.print("Whitelisted -->");
                   print_client(clients_known[uc]);
@@ -463,4 +480,3 @@ void loop() {
     }
   }
 }
-
